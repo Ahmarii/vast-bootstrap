@@ -23,9 +23,21 @@ elif command -v huggingface-cli >/dev/null 2>&1; then
     --local-dir "$TMP_DIR/$REPO_ID" \
     --local-dir-use-symlinks False >/dev/null
 else
-  python -m huggingface_hub download "$REPO_ID" "$REPO_FILE" \
-    --local-dir "$TMP_DIR/$REPO_ID" \
-    --local-dir-use-symlinks False >/dev/null
+  python - "$REPO_ID" "$REPO_FILE" "$TMP_DIR/$REPO_ID" <<'PY'
+import os
+import sys
+from huggingface_hub import hf_hub_download
+
+repo_id, repo_file, local_dir = sys.argv[1:4]
+token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
+hf_hub_download(
+    repo_id=repo_id,
+    filename=repo_file,
+    local_dir=local_dir,
+    local_dir_use_symlinks=False,
+    token=token,
+)
+PY
 fi
 
 SRC_PATH="$TMP_DIR/$REPO_ID/$REPO_FILE"
