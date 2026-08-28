@@ -1,0 +1,35 @@
+{
+  "name": "MINIKrea2 RTX-EZ Base",
+  "image": "vastai/comfy",
+  "tag": "v0.30.0-cuda-13.2-py312",
+  "desc": "Private ComfyUI base template for MINIKrea2 / RTX-EZ setup on Vast.ai.",
+  "readme": "# MINIKrea2 RTX-EZ Base\n\nPrivate Vast.ai template for ComfyUI-based MINIKrea2 / RTX-EZ work.\n\nWhat this template does:\n- Uses `vastai/comfy:v0.30.0-cuda-13.2-py312`\n- Keeps ComfyUI and Vast app wiring\n- Starts in Jupyter + SSH mode\n- Sets clean defaults for ComfyUI arguments and workspace paths\n- Leaves heavy workflow bootstrap to follow-up provisioning or a future custom image\n\nWhy this exists:\n- Avoid repeating the same template settings manually\n- Keep a stable base before moving to a heavier custom image\n- Preserve direct ComfyUI/Jupyter/SSH access while we harden provisioning\n\nNotes:\n- ComfyUI is the required app.\n- Vast `api-wrapper` is optional for direct SSH-tunnel usage, but the base image may still expose it for portal integration.\n- If stock provisioning still wastes time on default model downloads, the next step is either a custom `PROVISIONING_SCRIPT` URL or a fully custom image.\n",
+  "env": "-p 1111:11111 -p 8080:8080 -p 8384:8384 -p 72299:72299 -p 8188:18188 -p 8288:8288 -p 10100:10100 -p 10200:10200 -e COMFYUI_ARGS=\"--disable-auto-launch --disable-xformers --port 18188 --enable-cors-header\" -e COMFYUI_API_BASE=\"http://localhost:18188\" -e OPEN_BUTTON_PORT=\"1111\" -e JUPYTER_DIR=\"/\" -e DATA_DIRECTORY=\"/workspace/\" -e WORKSPACE=\"/workspace\" -e HF_XET_HIGH_PERFORMANCE=\"1\" -e CIVITAI_BASE_URL=\"https://civitai.red\"",
+  "onstart": "echo 'MINIKrea2 base template start';",
+  "runtype": "jupyter",
+  "ssh_direct": true,
+  "use_ssh": true,
+  "jup_direct": true,
+  "jupyter_dir": "/",
+  "use_jupyter_lab": false,
+  "docker_login_repo": "",
+  "docker_login_user": "",
+  "docker_login_pass": "",
+  "href": "https://hub.docker.com/r/vastai/comfy/",
+  "extra_filters": {
+    "compute_cap": {
+      "gte": 800
+    },
+    "cuda_max_good": {
+      "gte": 13
+    },
+    "cpu_arch": {
+      "in": [
+        "amd64",
+        "arm64"
+      ]
+    }
+  },
+  "recommended_disk_space": 100,
+  "private": true
+}
