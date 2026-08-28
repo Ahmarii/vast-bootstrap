@@ -186,20 +186,23 @@ hf_download() {
   mkdir -p "$dest_dir"
   "$PY_BIN" - "$repo_id" "$repo_file" "$dest_dir" "$dest_name" <<'PY'
 import os
-import shutil
 import sys
-from huggingface_hub import hf_hub_download
+import requests
 
 repo_id, repo_file, dest_dir, dest_name = sys.argv[1:5]
 token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_HUB_TOKEN")
-tmp_path = hf_hub_download(
-    repo_id=repo_id,
-    filename=repo_file,
-    token=token,
-)
 dest_path = os.path.join(dest_dir, dest_name)
 os.makedirs(dest_dir, exist_ok=True)
-shutil.copy2(tmp_path, dest_path)
+url = f"https://huggingface.co/{repo_id}/resolve/main/{repo_file}"
+headers = {}
+if token:
+    headers["Authorization"] = f"Bearer {token}"
+with requests.get(url, headers=headers, stream=True, timeout=60, allow_redirects=True) as response:
+    response.raise_for_status()
+    with open(dest_path, "wb") as handle:
+        for chunk in response.iter_content(chunk_size=16 * 1024 * 1024):
+            if chunk:
+                handle.write(chunk)
 print(dest_path)
 PY
 }
