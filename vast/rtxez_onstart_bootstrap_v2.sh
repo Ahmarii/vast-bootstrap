@@ -14,6 +14,7 @@ TOOL_DIR="/workspace/minikrea2-tool"
 RUNTIME_DIR="$TOOL_DIR/runtime"
 STATE_DIR="$RUNTIME_DIR/state"
 LOG_DIR="$RUNTIME_DIR/logs"
+STATUS_JSON="$STATE_DIR/status.json"
 COMFYUI_DIR="${COMFYUI_DIR:-/workspace/ComfyUI}"
 if [[ ! -d "$COMFYUI_DIR" && -d /opt/workspace-internal/ComfyUI ]]; then
   COMFYUI_DIR="/opt/workspace-internal/ComfyUI"
@@ -40,6 +41,122 @@ ln -sf "$PY_BIN" /usr/local/bin/python3 || true
 
 NODE_LOG="$LOG_DIR/rtxez_nodes.log"
 MODEL_LOG="$LOG_DIR/rtxez_models.log"
+
+json_escape() {
+  local value="${1:-}"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/}"
+  printf '%s' "$value"
+}
+
+update_status() {
+  local phase="$1"
+  local detail="${2:-}"
+  cat > "$STATUS_JSON" <<EOF
+{"phase":"$(json_escape "$phase")","detail":"$(json_escape "$detail")","updated_at":"$(date --iso-8601=seconds)","comfyui_dir":"$(json_escape "$COMFYUI_DIR")"}
+EOF
+}
+
+write_status_portal() {
+  cat > "$TOOL_DIR/status_portal.py" <<'EOF'
+#!/usr/bin/env python3
+import json
+import os
+import socketserver
+from http.server import BaseHTTPRequestHandler
+
+STATE_DIR = "/workspace/minikrea2-tool/runtime/state"
+LOG_DIR = "/workspace/minikrea2-tool/runtime/logs"
+STATUS_JSON = os.path.join(STATE_DIR, "status.json")
+
+
+def read_text(path, limit=120):
+    if not os.path.exists(path):
+        return []
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        lines = handle.readlines()
+    return lines[-limit:]
+
+
+def read_status():
+    if not os.path.exists(STATUS_JSON):
+        return {
+            "phase": "starting",
+            "detail": "Status file not written yet.",
+            "updated_at": "",
+            "comfyui_dir": "",
+        }
+    with open(STATUS_JSON, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+class Handler(BaseHTTPRequestHandler):
+    def _send(self, code, body, content_type):
+        body_bytes = body.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body_bytes)))
+        self.end_headers()
+        self.wfile.write(body_bytes)
+
+    def do_GET(self):
+        if self.path == "/status.json":
+            self._send(200, json.dumps(read_status()), "application/json")
+            return
+
+        status = read_status()
+        bootstrap_log = "".join(read_text(os.path.join(LOG_DIR, "rtxez_onstart_bootstrap_v2.log"), 80))
+        node_log = "".join(read_text(os.path.join(LOG_DIR, "rtxez_nodes.log"), 40))
+        model_log = "".join(read_text(os.path.join(LOG_DIR, "rtxez_models.log"), 40))
+        body = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="10">
+  <title>MINIKrea2 Bootstrap Status</title>
+  <style>
+    body {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #101418; color: #e6edf3; margin: 0; padding: 24px; }}
+    h1, h2 {{ margin: 0 0 12px; }}
+    .card {{ background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px; margin: 0 0 16px; }}
+    .phase {{ font-size: 24px; color: #58a6ff; }}
+    .detail {{ color: #c9d1d9; margin-top: 8px; }}
+    pre {{ white-space: pre-wrap; word-break: break-word; margin: 0; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>MINIKrea2 RTX-EZ Bootstrap</h1>
+    <div class="phase">{status.get("phase","unknown")}</div>
+    <div class="detail">{status.get("detail","")}</div>
+    <div class="detail">Updated: {status.get("updated_at","")}</div>
+    <div class="detail">ComfyUI dir: {status.get("comfyui_dir","")}</div>
+  </div>
+  <div class="card"><h2>Bootstrap Log</h2><pre>{bootstrap_log}</pre></div>
+  <div class="card"><h2>Node Log</h2><pre>{node_log}</pre></div>
+  <div class="card"><h2>Model Log</h2><pre>{model_log}</pre></div>
+</body>
+</html>"""
+        self._send(200, body, "text/html; charset=utf-8")
+
+    def log_message(self, format, *args):
+        return
+
+
+if __name__ == "__main__":
+    with socketserver.ThreadingTCPServer(("0.0.0.0", 1111), Handler) as httpd:
+        httpd.serve_forever()
+EOF
+  chmod +x "$TOOL_DIR/status_portal.py"
+}
+
+start_status_portal() {
+  write_status_portal
+  if ! pgrep -f "$TOOL_DIR/status_portal.py" >/dev/null 2>&1; then
+    nohup "$PY_BIN" "$TOOL_DIR/status_portal.py" >"$LOG_DIR/status_portal.log" 2>&1 </dev/null &
+  fi
+}
 
 write_status_script() {
   cat > "$TOOL_DIR/check_rtxez_bootstrap.sh" <<'EOF'
@@ -205,6 +322,7 @@ PY
 
 install_nodes() {
   : > "$NODE_LOG"
+  update_status "installing_nodes" "Installing Python packages and ComfyUI custom nodes."
   log "node install start" | tee -a "$NODE_LOG"
   mkdir -p "$COMFYUI_DIR/custom_nodes"
 
@@ -235,10 +353,12 @@ install_nodes() {
 
   fix_torchvision
   log "node install done" | tee -a "$NODE_LOG"
+  update_status "nodes_ready" "Node installation and compatibility fixes completed."
 }
 
 download_models() {
   : > "$MODEL_LOG"
+  update_status "downloading_models" "Starting large H3 model downloads."
   log "model download start" | tee -a "$MODEL_LOG"
 
   mkdir -p \
@@ -274,6 +394,7 @@ download_models() {
   wait "$P4" "$P5" "$P6" "$P7" "$P8" "$P9" "$P10" "$P11"
 
   log "model download done" | tee -a "$MODEL_LOG"
+  update_status "models_ready" "All scheduled RTX-EZ models and LoRAs downloaded."
 }
 
 log "start $(date --iso-8601=seconds)"
@@ -281,6 +402,9 @@ log "workspace=$(readlink -f /workspace || echo /workspace)"
 log "comfyui_dir=$COMFYUI_DIR"
 if [[ -n "${HF_TOKEN:-}" ]]; then log "HF token detected"; else log "HF token missing"; fi
 if [[ -n "${CIVITAI_API_KEY:-${CIVITAI_TOKEN:-}}" ]]; then log "Civitai token detected"; else log "Civitai token missing"; fi
+
+update_status "booting" "Preparing workspace and installing system packages."
+start_status_portal
 
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -299,4 +423,5 @@ write_status_script
 install_nodes
 download_models
 
+update_status "complete" "Bootstrap finished. ComfyUI can be started or checked now."
 log "done $(date --iso-8601=seconds)"
