@@ -39,6 +39,13 @@ fi
 ln -sf "$PY_BIN" /usr/local/bin/python || true
 ln -sf "$PY_BIN" /usr/local/bin/python3 || true
 
+if [[ -f /workspace/.env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source /workspace/.env
+  set +a
+fi
+
 NODE_LOG="$LOG_DIR/rtxez_nodes.log"
 MODEL_LOG="$LOG_DIR/rtxez_models.log"
 
@@ -734,6 +741,22 @@ print(dest_path)
 PY
 }
 
+ensure_alias() {
+  local target_path="$1"
+  local alias_path="$2"
+  mkdir -p "$(dirname "$alias_path")"
+  if [[ -f "$target_path" && ! -e "$alias_path" ]]; then
+    ln -s "$(basename "$target_path")" "$alias_path"
+  fi
+}
+
+write_lora_aliases() {
+  ensure_alias "$COMFYUI_DIR/models/loras/HMNSFW_AIO_Sex_LoRA.safetensors" "$COMFYUI_DIR/models/loras/HMNSFW-AIO-V2.5.safetensors"
+  ensure_alias "$COMFYUI_DIR/models/loras/H3_Vagina_MMH3.safetensors" "$COMFYUI_DIR/models/loras/Vagina_minimax-h3_epoch20.safetensors"
+  ensure_alias "$COMFYUI_DIR/models/loras/HM_Pussy_Pussyanus_MMH3.safetensors" "$COMFYUI_DIR/models/loras/minimax_vag_000002500.safetensors"
+  ensure_alias "$COMFYUI_DIR/models/loras/vagassist_e40.safetensors" "$COMFYUI_DIR/models/loras/minimax_vag_000002500.safetensors"
+}
+
 clone_or_update() {
   local repo_url="$1"
   local dest_dir="$2"
@@ -851,6 +874,8 @@ download_models() {
   civitai_download "3200540" "$COMFYUI_DIR/models/loras" "H3_Vagina_MMH3.safetensors" >>"$MODEL_LOG" 2>&1 &
   P11=$!
   wait "$P4" "$P5" "$P6" "$P7" "$P8" "$P9" "$P10" "$P11"
+
+  write_lora_aliases
 
   log "model download done" | tee -a "$MODEL_LOG"
   update_status "models_ready" "All scheduled RTX-EZ models and LoRAs downloaded."
