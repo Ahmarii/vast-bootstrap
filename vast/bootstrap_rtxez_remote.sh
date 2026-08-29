@@ -211,7 +211,7 @@ download_models() {
   pids+=("$!")
 
   log_model "queue hf tiny vae"
-  run_hf "Kijai/MiniMax-H3-TAE" "taeh3.safetensors" "$COMFYUI_DIR/models/vae" &
+  run_hf "Kijai/MiniMax-H3-TAE" "vae_approx/taeh3.safetensors" "$COMFYUI_DIR/models/vae_approx" &
   pids+=("$!")
 
   log_model "queue civitai hmnsfw aio sex lora"
