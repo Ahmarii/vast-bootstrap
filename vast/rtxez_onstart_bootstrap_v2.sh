@@ -865,6 +865,8 @@ download_models() {
   P6=$!
   hf_download "Kijai/MiniMax-H3_comfy" "loras/minimax_h3_fl2v_lightx2v_turbo_4step_v0.1_comfy.safetensors" "$COMFYUI_DIR/models/loras" >>"$MODEL_LOG" 2>&1 &
   P7=$!
+  hf_download "drbaph/MiniMax-H3-Turbo-Lora-ComfyUI" "minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors" "$COMFYUI_DIR/models/loras" >>"$MODEL_LOG" 2>&1 &
+  P7B=$!
   civitai_download "3268303" "$COMFYUI_DIR/models/loras" "HMNSFW_AIO_Sex_LoRA.safetensors" >>"$MODEL_LOG" 2>&1 &
   P8=$!
   civitai_download "3266628" "$COMFYUI_DIR/models/loras" "MysticXXX_MMH3-V4.safetensors" >>"$MODEL_LOG" 2>&1 &
@@ -873,7 +875,7 @@ download_models() {
   P10=$!
   civitai_download "3200540" "$COMFYUI_DIR/models/loras" "H3_Vagina_MMH3.safetensors" >>"$MODEL_LOG" 2>&1 &
   P11=$!
-  wait "$P4" "$P5" "$P6" "$P7" "$P8" "$P9" "$P10" "$P11"
+  wait "$P4" "$P5" "$P6" "$P7" "$P7B" "$P8" "$P9" "$P10" "$P11"
 
   write_lora_aliases
 
