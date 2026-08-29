@@ -34,3 +34,9 @@ Recommendation:
 
 - Keep the custom portal as the open-button target because it is available immediately and can show bootstrap progress before ComfyUI is ready.
 - Keep `PORTAL_CONFIG` populated anyway. It costs almost nothing and preserves compatibility with the stock Vast portal stack.
+
+Update on August 29, 2026:
+
+- The template `onstart` path now fetches `rtxez_onstart_entrypoint.sh`, not the heavy bootstrap directly.
+- That entrypoint writes an initial `status.json`, launches the Vast-style custom portal immediately on `OPEN_BUTTON_PORT`, and only then fetches and launches `rtxez_onstart_bootstrap_v2.sh`.
+- Result: the portal becomes visible first, while node installs and model downloads continue behind it.
