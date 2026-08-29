@@ -90,6 +90,15 @@ PY
 
 persist_runtime_env
 
+start_portal_instance() {
+  local port="$1"
+  local log_name="$2"
+  if ss -ltn 2>/dev/null | grep -q ":${port} "; then
+    return
+  fi
+  nohup env OPEN_BUTTON_PORT="$port" "$PY_BIN" "$PORTAL_SCRIPT" >"$LOG_DIR/${log_name}" 2>&1 </dev/null &
+}
+
 cat > "$STATUS_JSON" <<EOF
 {"phase":"starting","detail":"Portal started. Waiting for bootstrap worker to begin.","updated_at":"$(date --iso-8601=seconds)","comfyui_dir":"/workspace/ComfyUI"}
 EOF
@@ -97,8 +106,9 @@ EOF
 curl -fsSL "$PORTAL_SOURCE_URL" -o "$PORTAL_SCRIPT"
 chmod +x "$PORTAL_SCRIPT"
 
-if ! pgrep -f "$PORTAL_SCRIPT" >/dev/null 2>&1; then
-  nohup "$PY_BIN" "$PORTAL_SCRIPT" >"$LOG_DIR/status_portal.log" 2>&1 </dev/null &
+start_portal_instance "${OPEN_BUTTON_PORT:-1111}" "status_portal.log"
+if [[ -n "${VAST_TCP_PORT_11111:-}" && "${OPEN_BUTTON_PORT:-1111}" != "11111" ]]; then
+  start_portal_instance "11111" "status_portal_11111.log"
 fi
 
 cat > "$STATUS_JSON" <<EOF

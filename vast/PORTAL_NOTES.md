@@ -40,3 +40,5 @@ Update on August 29, 2026:
 - The template `onstart` path now fetches `rtxez_onstart_entrypoint.sh`, not the heavy bootstrap directly.
 - That entrypoint writes an initial `status.json`, launches the Vast-style custom portal immediately on `OPEN_BUTTON_PORT`, and only then fetches and launches `rtxez_onstart_bootstrap_v2.sh`.
 - Result: the portal becomes visible first, while node installs and model downloads continue behind it.
+- Some Vast instances still expose the open-button public mapping through internal port `11111` even when the template requests `1111`.
+- To avoid another port-mapping farce, the entrypoint now also starts the same portal on `11111` when `VAST_TCP_PORT_11111` exists.
